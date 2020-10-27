@@ -72,7 +72,6 @@ try:
 except AttributeError:
   _BaseClass = object
 
-
 class DetectionModel(six.with_metaclass(abc.ABCMeta, _BaseClass)):
   """Abstract base class for detection models.
 
@@ -375,58 +374,58 @@ class DetectionModel(six.with_metaclass(abc.ABCMeta, _BaseClass)):
     self._groundtruth_lists[fields.BoxListFields.boxes] = groundtruth_boxes_list
     self._groundtruth_lists[
         fields.BoxListFields.classes] = groundtruth_classes_list
-    if groundtruth_weights_list:
+    if groundtruth_weights_list is not None:
       self._groundtruth_lists[fields.BoxListFields.
                               weights] = groundtruth_weights_list
-    if groundtruth_confidences_list:
+    if groundtruth_confidences_list is not None:
       self._groundtruth_lists[fields.BoxListFields.
                               confidences] = groundtruth_confidences_list
-    if groundtruth_masks_list:
+    if groundtruth_masks_list is not None:
       self._groundtruth_lists[
           fields.BoxListFields.masks] = groundtruth_masks_list
-    if groundtruth_keypoints_list:
+    if groundtruth_keypoints_list is not None:
       self._groundtruth_lists[
           fields.BoxListFields.keypoints] = groundtruth_keypoints_list
-    if groundtruth_keypoint_visibilities_list:
+    if groundtruth_keypoint_visibilities_list is not None:
       self._groundtruth_lists[
           fields.BoxListFields.keypoint_visibilities] = (
               groundtruth_keypoint_visibilities_list)
-    if groundtruth_dp_num_points_list:
+    if groundtruth_dp_num_points_list is not None:
       self._groundtruth_lists[
           fields.BoxListFields.densepose_num_points] = (
               groundtruth_dp_num_points_list)
-    if groundtruth_dp_part_ids_list:
+    if groundtruth_dp_part_ids_list is not None:
       self._groundtruth_lists[
           fields.BoxListFields.densepose_part_ids] = (
               groundtruth_dp_part_ids_list)
-    if groundtruth_dp_surface_coords_list:
+    if groundtruth_dp_surface_coords_list is not None:
       self._groundtruth_lists[
           fields.BoxListFields.densepose_surface_coords] = (
               groundtruth_dp_surface_coords_list)
-    if groundtruth_track_ids_list:
+    if groundtruth_track_ids_list is not None:
       self._groundtruth_lists[
           fields.BoxListFields.track_ids] = groundtruth_track_ids_list
-    if groundtruth_temporal_offsets_list:
+    if groundtruth_temporal_offsets_list is not None:
       self._groundtruth_lists[
           fields.BoxListFields.temporal_offsets] = (
               groundtruth_temporal_offsets_list)
-    if groundtruth_track_match_flags_list:
+    if groundtruth_track_match_flags_list is not None:
       self._groundtruth_lists[
           fields.BoxListFields.track_match_flags] = (
               groundtruth_track_match_flags_list)
-    if groundtruth_is_crowd_list:
+    if groundtruth_is_crowd_list is not None:
       self._groundtruth_lists[
           fields.BoxListFields.is_crowd] = groundtruth_is_crowd_list
-    if groundtruth_group_of_list:
+    if groundtruth_group_of_list is not None:
       self._groundtruth_lists[
           fields.BoxListFields.group_of] = groundtruth_group_of_list
-    if groundtruth_area_list:
+    if groundtruth_area_list is not None:
       self._groundtruth_lists[
           fields.InputDataFields.groundtruth_area] = groundtruth_area_list
-    if is_annotated_list:
+    if is_annotated_list is not None:
       self._groundtruth_lists[
           fields.InputDataFields.is_annotated] = is_annotated_list
-    if groundtruth_labeled_classes:
+    if groundtruth_labeled_classes is not None:
       self._groundtruth_lists[
           fields.InputDataFields
           .groundtruth_labeled_classes] = groundtruth_labeled_classes
