@@ -160,7 +160,7 @@ def _prepare_groundtruth_for_eval(detection_model, class_agnostic,
     labeled_classes_list = detection_model.groundtruth_lists(
         fields.InputDataFields.groundtruth_labeled_classes)
     labeled_classes = [
-        tf.where(x)[:, 0] + label_id_offset for x in labeled_classes_list
+        tf.where(x)[:, 0] + label_id_offset for x in tf.unstack(labeled_classes_list)
     ]
     if len(labeled_classes) > 1:
       num_classes = labeled_classes_list[0].shape[0]
