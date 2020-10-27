@@ -380,6 +380,9 @@ def create_visualization_fn(category_index,
     boxes = args[1]
     classes = args[2]
     scores = args[3]
+
+    #print('visualization_py_func_fn args shapes', [x.shape for x in args])
+
     masks = keypoints = keypoint_scores = track_ids = None
     pos_arg_ptr = 4  # Positional argument for first optional tensor (masks).
     if include_masks:
@@ -511,7 +514,6 @@ def _resize_original_image(image, image_shape):
       align_corners=True)
   return tf.cast(tf.squeeze(image, 0), tf.uint8)
 
-
 def draw_bounding_boxes_on_image_tensors(images,
                                          boxes,
                                          classes,
@@ -614,13 +616,12 @@ def draw_bounding_boxes_on_image_tensors(images,
     if original_image_spatial_shape is not None:
       image_and_detections[2] = _resize_original_image(image, original_shape)
 
-    image_with_boxes = tf.py_func(visualize_boxes_fn, image_and_detections[2:],
+    image_with_boxes = tf.numpy_function(visualize_boxes_fn, image_and_detections[2:],
                                   tf.uint8)
     return image_with_boxes
 
   images = tf.map_fn(draw_boxes, elems, dtype=tf.uint8, back_prop=False)
   return images
-
 
 def draw_side_by_side_evaluation_image(eval_dict,
                                        category_index,
@@ -703,6 +704,7 @@ def draw_side_by_side_evaluation_image(eval_dict,
             keypoint_ops.set_keypoint_visibilities(
                 groundtruth_keypoints), dtype=tf.float32)
 
+    
     images_with_detections = draw_bounding_boxes_on_image_tensors(
         tf.expand_dims(
             eval_dict[input_data_fields.original_image][indx], axis=0),
@@ -725,6 +727,7 @@ def draw_side_by_side_evaluation_image(eval_dict,
         max_boxes_to_draw=max_boxes_to_draw,
         min_score_thresh=min_score_thresh,
         use_normalized_coordinates=use_normalized_coordinates)
+    
     images_with_groundtruth = draw_bounding_boxes_on_image_tensors(
         tf.expand_dims(
             eval_dict[input_data_fields.original_image][indx], axis=0),
@@ -750,6 +753,7 @@ def draw_side_by_side_evaluation_image(eval_dict,
         max_boxes_to_draw=None,
         min_score_thresh=0.0,
         use_normalized_coordinates=use_normalized_coordinates)
+    
     images_to_visualize = tf.concat([images_with_detections,
                                      images_with_groundtruth], axis=2)
 
