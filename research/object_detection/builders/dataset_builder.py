@@ -94,7 +94,7 @@ def _read_dataset_internal(file_read_func,
   if filename_shard_fn:
     filename_dataset = filename_shard_fn(filename_dataset)
 
-  filename_dataset = filename_dataset.repeat(config.num_epochs or None)
+  #filename_dataset = filename_dataset.repeat(config.num_epochs or None)
   records_dataset = filename_dataset.apply(
       tf.data.experimental.parallel_interleave(
           file_read_func,
