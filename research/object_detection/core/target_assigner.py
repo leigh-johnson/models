@@ -103,6 +103,7 @@ class TargetAssigner(object):
     return self._box_coder
 
   # TODO(rathodv): move labels, scores, and weights to groundtruth_boxes fields.
+  
   def assign(self,
              anchors,
              groundtruth_boxes,
@@ -162,10 +163,9 @@ class TargetAssigner(object):
         box_list.BoxList
     """
     if not isinstance(anchors, box_list.BoxList):
-      raise ValueError('anchors must be an BoxList')
+      anchors = box_list.BoxList(anchors)
     if not isinstance(groundtruth_boxes, box_list.BoxList):
-      raise ValueError('groundtruth_boxes must be an BoxList')
-
+      groundtruth_boxes = box_list.BoxList(groundtruth_boxes)
     if unmatched_class_label is None:
       unmatched_class_label = tf.constant([0], tf.float32)
 
@@ -441,7 +441,6 @@ def create_target_assigner(reference, stage=None,
   return TargetAssigner(similarity_calc, matcher, box_coder_instance,
                         negative_class_weight=negative_class_weight)
 
-
 def batch_assign(target_assigner,
                  anchors_batch,
                  gt_box_batch,
@@ -454,8 +453,13 @@ def batch_assign(target_assigner,
     target_assigner: a target assigner.
     anchors_batch: BoxList representing N box anchors or list of BoxList objects
       with length batch_size representing anchor sets.
-    gt_box_batch: a list of BoxList objects with length batch_size
-      representing groundtruth boxes for each image in the batch
+    # gt_box_batch: a list of BoxList objects with length batch_size
+    #   representing groundtruth boxes for each image in the batch
+    gt_box_batch: a list of 2-D tensors of shape [num_boxes, 4]
+        containing coordinates of the groundtruth boxes.
+          Groundtruth boxes are provided in [y_min, x_min, y_max, x_max]
+          format and assumed to be normalized and clipped
+          relative to the image window with y_min <= y_max and x_min <= x_max.
     gt_class_targets_batch: a list of tensors with length batch_size, where
       each tensor has shape [num_gt_boxes_i, classification_target_size] and
       num_gt_boxes_i is the number of boxes in the ith boxlist of
@@ -490,14 +494,15 @@ def batch_assign(target_assigner,
         and batch_size == len(anchors_batch) unless anchors_batch is a single
         BoxList.
   """
+
+  batch_size = gt_box_batch.shape[0]
   if not isinstance(anchors_batch, list):
-    anchors_batch = len(gt_box_batch) * [anchors_batch]
-  if not all(
-      isinstance(anchors, box_list.BoxList) for anchors in anchors_batch):
+    anchors_batch = batch_size * [anchors_batch]
+  elif not isinstance(anchors_batch, box_list.BoxList):
     raise ValueError('anchors_batch must be a BoxList or list of BoxLists.')
   if not (len(anchors_batch)
-          == len(gt_box_batch)
-          == len(gt_class_targets_batch)):
+          == gt_box_batch.shape[0]
+          == gt_class_targets_batch.shape[0]):
     raise ValueError('batch size incompatible with lengths of anchors_batch, '
                      'gt_box_batch and gt_class_targets_batch.')
   cls_targets_list = []
@@ -507,11 +512,19 @@ def batch_assign(target_assigner,
   match_list = []
   if gt_weights_batch is None:
     gt_weights_batch = [None] * len(gt_class_targets_batch)
-  for anchors, gt_boxes, gt_class_targets, gt_weights in zip(
-      anchors_batch, gt_box_batch, gt_class_targets_batch, gt_weights_batch):
+
+  zipped = zip(
+      anchors_batch, 
+      tf.unstack(gt_box_batch), 
+      tf.unstack(gt_class_targets_batch), 
+      tf.unstack(gt_weights_batch))
+  for anchors, gt_boxes, gt_class_targets, gt_weights in zipped:
+    
+    gt_boxes_obj = box_list.BoxList(gt_boxes)
+    
     (cls_targets, cls_weights,
      reg_targets, reg_weights, match) = target_assigner.assign(
-         anchors, gt_boxes, gt_class_targets, unmatched_class_label,
+         anchors, gt_boxes_obj, gt_class_targets, unmatched_class_label,
          gt_weights)
     cls_targets_list.append(cls_targets)
     cls_weights_list.append(cls_weights)
@@ -522,6 +535,8 @@ def batch_assign(target_assigner,
   batch_cls_weights = tf.stack(cls_weights_list)
   batch_reg_targets = tf.stack(reg_targets_list)
   batch_reg_weights = tf.stack(reg_weights_list)
+
+
   batch_match = tf.stack(match_list)
   return (batch_cls_targets, batch_cls_weights, batch_reg_targets,
           batch_reg_weights, batch_match)
@@ -2163,6 +2178,7 @@ class DETRTargetAssigner(object):
     if unmatched_class_label_batch is None:
       unmatched_class_label_batch = [None] * len(gt_class_targets_batch)
     pred_class_batch = tf.unstack(pred_class_batch)
+
     for (pred_boxes, gt_boxes, pred_class_batch, gt_class_targets, gt_weights,
          unmatched_class_label) in zip(pred_box_batch, gt_box_batch,
                                        pred_class_batch, gt_class_targets_batch,

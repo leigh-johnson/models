@@ -562,6 +562,8 @@ class SSDMetaArch(model.DetectionModel):
         8) raw_detection_feature_map_indices: a 3-D int32 tensor with shape
           [batch_size, self.max_num_proposals].
     """
+
+    print('self._feature_extractor.is_keras_model', self._feature_extractor.is_keras_model)
     if self._inplace_batchnorm_update:
       batchnorm_updates_collections = None
     else:
@@ -596,6 +598,7 @@ class SSDMetaArch(model.DetectionModel):
                           updates_collections=batchnorm_updates_collections):
         predictor_results_dict = self._box_predictor.predict(
             feature_maps, self._anchor_generator.num_anchors_per_location())
+    
     predictions_dict = {
         'preprocessed_inputs':
             preprocessed_inputs,
@@ -803,7 +806,7 @@ class SSDMetaArch(model.DetectionModel):
         detection_dict[
             fields.DetectionResultFields.detection_masks] = nmsed_masks
       return detection_dict
-
+  
   def loss(self, prediction_dict, true_image_shapes, scope=None):
     """Compute scalar loss tensors with respect to provided groundtruth.
 
@@ -839,11 +842,14 @@ class SSDMetaArch(model.DetectionModel):
       confidences = None
       if self.groundtruth_has_field(fields.BoxListFields.confidences):
         confidences = self.groundtruth_lists(fields.BoxListFields.confidences)
+
       (batch_cls_targets, batch_cls_weights, batch_reg_targets,
-       batch_reg_weights, batch_match) = self._assign_targets(
+      batch_reg_weights, batch_match ) = self._assign_targets(
            self.groundtruth_lists(fields.BoxListFields.boxes),
            self.groundtruth_lists(fields.BoxListFields.classes),
-           keypoints, weights, confidences)
+           keypoints, weights, confidences
+      )
+
       match_list = [matcher.Match(match) for match in tf.unstack(batch_match)]
       if self._add_summaries:
         self._summarize_target_assignment(
@@ -1041,16 +1047,48 @@ class SSDMetaArch(model.DetectionModel):
         (3) if match[x, i]=-2, anchor i is ignored since it is not background
             and does not have sufficient overlap to call it a foreground.
     """
-    groundtruth_boxlists = [
-        box_list.BoxList(boxes) for boxes in groundtruth_boxes_list
-    ]
+
+    # tensorflow.python.framework.errors_impl.OperatorNotAllowedInGraphError: in user code:
+
+    # /home/leigh/projects/defect_detector/.venv/lib/python3.8/site-packages/tensorflow/python/keras/engine/training.py:806 train_function  *
+    #     return step_function(self, iterator)
+    # /home/leigh/projects/defect_detector/models/research/object_detection/model_lib_v2.py:124 _compute_losses_and_predictions_dicts  *
+    #     losses_dict = model.loss(
+    # /home/leigh/projects/defect_detector/models/research/object_detection/meta_architectures/ssd_meta_arch.py:843 loss  *
+    #     (batch_cls_targets, batch_cls_weights, batch_reg_targets,       batch_reg_weights, batch_match ) = self._assign_targets(
+    # /home/leigh/projects/defect_detector/models/research/object_detection/meta_architectures/ssd_meta_arch.py:1050 _assign_targets  *
+    #     groundtruth_boxlists = [
+    # /home/leigh/projects/defect_detector/.venv/lib/python3.8/site-packages/tensorflow/python/framework/ops.py:503 __iter__
+    #     self._disallow_iteration()
+    # /home/leigh/projects/defect_detector/.venv/lib/python3.8/site-packages/tensorflow/python/framework/ops.py:496 _disallow_iteration
+    #     self._disallow_when_autograph_enabled("iterating over `tf.Tensor`")
+    # /home/leigh/projects/defect_detector/.venv/lib/python3.8/site-packages/tensorflow/python/framework/ops.py:472 _disallow_when_autograph_enabled
+    #     raise errors.OperatorNotAllowedInGraphError(
+
+    # OperatorNotAllowedInGraphError: iterating over `tf.Tensor` is not allowed: AutoGraph did convert this function. This might indicate you are trying to use an unsupported feature.
+
+
+    # replace list comprehensions over tf.Tensor with tf.map_fn
+  
+
     train_using_confidences = (self._is_training and
                                self._use_confidences_as_targets)
+
+  
     if self._add_background_class:
-      groundtruth_classes_with_background_list = [
-          tf.pad(one_hot_encoding, [[0, 0], [1, 0]], mode='CONSTANT')
-          for one_hot_encoding in groundtruth_classes_list
-      ]
+      # replace list comp
+      # groundtruth_classes_with_background_list = [
+      #     tf.pad(one_hot_encoding, [[0, 0], [1, 0]], mode='CONSTANT')
+      #     for one_hot_encoding in groundtruth_classes_list
+      # ]
+
+      # with tf.map_fn
+      groundtruth_classes_with_background_list = tf.map_fn(
+        lambda x: tf.pad(x, [[0, 0], [1, 0]], mode='CONSTANT'),
+        groundtruth_classes_list,
+        fn_output_signature=tf.float32
+      )
+
       if train_using_confidences:
         groundtruth_confidences_with_background_list = [
             tf.pad(groundtruth_confidences, [[0, 0], [1, 0]], mode='CONSTANT')
@@ -1067,7 +1105,7 @@ class SSDMetaArch(model.DetectionModel):
       return target_assigner.batch_assign_confidences(
           self._target_assigner,
           self.anchors,
-          groundtruth_boxlists,
+          groundtruth_boxes_list,
           groundtruth_confidences_with_background_list,
           groundtruth_weights_list,
           self._unmatched_class_label,
@@ -1077,7 +1115,7 @@ class SSDMetaArch(model.DetectionModel):
       return target_assigner.batch_assign_targets(
           self._target_assigner,
           self.anchors,
-          groundtruth_boxlists,
+          groundtruth_boxes_list,
           groundtruth_classes_with_background_list,
           self._unmatched_class_label,
           groundtruth_weights_list)
@@ -1099,22 +1137,29 @@ class SSDMetaArch(model.DetectionModel):
         and columns corresponding to anchors.
     """
     # TODO(rathodv): Add a test for these summaries.
-    try:
-      # TODO(kaftan): Integrate these summaries into the v2 style loops
-      with tf.compat.v2.init_scope():
-        if tf.compat.v2.executing_eagerly():
-          return
-    except AttributeError:
-      pass
+    # try:
+    #   # TODO(kaftan): Integrate these summaries into the v2 style loops
+    #   with tf.compat.v2.init_scope():
+    #     if tf.compat.v2.executing_eagerly():
+    #       return
+    # except AttributeError:
+    #   pass
 
-    avg_num_gt_boxes = tf.reduce_mean(
-        tf.cast(
-            tf.stack([tf.shape(x)[0] for x in groundtruth_boxes_list]),
-            dtype=tf.float32))
+    #import pdb; pdb.set_trace()
+
+    # avg_num_gt_boxes = tf.reduce_mean(
+    #     tf.cast(
+    #         tf.stack([tf.shape(x)[0] for x in groundtruth_boxes_list]),
+    #         dtype=tf.float32))
+
+    avg_num_gt_boxes = tf.reduce_mean(groundtruth_boxes_list)
+
     avg_num_matched_gt_boxes = tf.reduce_mean(
         tf.cast(
             tf.stack([match.num_matched_rows() for match in match_list]),
             dtype=tf.float32))
+  
+
     avg_pos_anchors = tf.reduce_mean(
         tf.cast(
             tf.stack([match.num_matched_columns() for match in match_list]),
