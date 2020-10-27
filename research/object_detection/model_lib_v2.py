@@ -53,7 +53,6 @@ RESTORE_MAP_ERROR_TEMPLATE = (
     ' but we received a ({} -> {}) mapping instead.'
 )
 
-
 def _compute_losses_and_predictions_dicts(
     model, features, labels,
     add_regularization_loss=True):
@@ -121,8 +120,6 @@ def _compute_losses_and_predictions_dicts(
       preprocessed_images,
       features[fields.InputDataFields.true_image_shape],
       **model.get_side_inputs(features))
-  prediction_dict = ops.bfloat16_to_float32_nested(prediction_dict)
-
   losses_dict = model.loss(
       prediction_dict, features[fields.InputDataFields.true_image_shape])
   losses = [loss_tensor for loss_tensor in losses_dict.values()]
@@ -529,6 +526,7 @@ def train_loop(
     global_step = tf.Variable(
         0, trainable=False, dtype=tf.compat.v2.dtypes.int64, name='global_step',
         aggregation=tf.compat.v2.VariableAggregation.ONLY_FIRST_REPLICA)
+
     optimizer, (learning_rate,) = optimizer_builder.build(
         train_config.optimizer, global_step=global_step)
 
@@ -724,7 +722,6 @@ def eager_eval_loop(
   evaluators = None
   loss_metrics = {}
 
-  @tf.function
   def compute_eval_dict(features, labels):
     """Compute the evaluation result on an image."""
     # For evaling on train data, it is necessary to check whether groundtruth
@@ -955,7 +952,6 @@ def eval_continuously(
         model_config=model_config,
         model=detection_model)
     eval_inputs.append((eval_input_config.name, next_eval_input))
-
   if eval_index is not None:
     eval_inputs = [eval_inputs[eval_index]]
 
